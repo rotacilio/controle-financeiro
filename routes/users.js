@@ -100,6 +100,7 @@ router.put('/:user_id', (req, res, next) => {
   });
 });
 
+/* Delete a registered user by primary key */
 router.delete('/:user_id', (req, res, next) => {
   const results = [];
   const user_id = req.params.user_id;
@@ -122,6 +123,69 @@ router.delete('/:user_id', (req, res, next) => {
     query.on('end', () => {
       done();
       return res.json(results);
+    });
+  });
+});
+
+/* Find a registered user by primary key */
+router.get('/:user_id', (req, res, next) => {
+
+  user.findByPk(req.params.user_id);
+
+  const result = {};
+  const user_id = req.params.user_id;
+
+  pg.connect(connectionString, (err, client, done) => {
+    if (err) {
+      done();
+      console.log(err);
+      return res.status(500).json({success:false, data:err});
+    }
+
+    const query = client.query("SELECT * FROM tb_users WHERE user_id = $1", [user_id]);
+
+    query.on('row', (row) => {
+      Object.keys(row).map((el, index, arr) => {
+        result[el] = row[el];
+      });
+    });
+
+    query.on('end', () => {
+      done();
+      return res.json(result);
+    });
+  });
+});
+
+router.post('/authenticate', (req, res, next) => {
+  const username = req.body.username;
+  const userObj = {};
+  
+  pg.connect(connectionString, (err, client, done) => {
+    if (err) {
+      done();
+      console.log(err);
+      return res.status(500).json({success:false, data:err});
+    }
+
+    const query = client.query("SELECT * FROM tb_users WHERE user_email = $1", [username]);
+
+    query.on('row', (row) => {
+      Object.keys(row).map((el, key, arr) => {
+        userObj[el] = row[el];
+      });
+    });
+
+    query.on('end', () => {
+      done();
+      if (!userObj.user_id) {
+        return res.status(404).json({success:false, message:"Não encontramos nenhum usuário com este e-mail!"});
+      } else if (userObj.user_password != req.body.password) {
+        return res.status(404).json({success:false, message:"A senha informada não confere!"});
+      } else if (!userObj.user_status) {
+        return res.status(500).json({success:false, message:"Este usuário está desativado!"});
+      }
+      return res.json(userObj);
     });
   });
 });
